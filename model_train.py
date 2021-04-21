@@ -13,6 +13,7 @@ from keras.regularizers import l1,l2
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping
 import tensorflow as tf
+from icecream import ic
 run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
 
 class DataGenerator(keras.utils.Sequence):
@@ -165,8 +166,8 @@ def train_test_split(partition_train, validation_size=5):
 
 def partition_get():
 	partition={}
-	sample_names = glob.glob(os.path.join('data/*.npy'))
-	sample_names = [x.replace("data/","").replace(".npy","") for x in sample_names]
+	sample_names_train = glob.glob(os.path.join('data/train/input_/*.npy'))
+	sample_names = [x.replace("data/train/input_/","").replace(".npy","") for x in sample_names]
 	print(sample_names)
 
 	partition['train'] = sample_names[:30]
