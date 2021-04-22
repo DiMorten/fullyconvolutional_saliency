@@ -82,8 +82,8 @@ class DataGenerator(keras.utils.Sequence):
 		for i, ID in enumerate(list_IDs_temp):
 			# Store sample
 
-#			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
-			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)
+			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+#			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)
 
 #			ic(np.average(X[i]))
 			##ic(X[i].shape)
@@ -103,7 +103,7 @@ class DataGenerator(keras.utils.Sequence):
 			##pdb.set_trace()
 
 			Y[i] = label.astype(np.int)/255
-		X = self.scalerApply(X)	
+#		X = self.scalerApply(X)	
 		#ic(np.average(X), np.std(X))	
 		#pdb.set_trace()	
 
