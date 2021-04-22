@@ -22,10 +22,10 @@ import joblib
 
 #run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
 def load_labels(partition, params):
-	samples = np.zeros((len(partition), *params['dim'] , params['n_classes']))
+	samples = np.zeros((len(partition), *params['label_dim'] , params['n_classes']))
 	for idx, filename in enumerate(partition):
 		#ic(filename)
-		samples[idx] = np.load('labels/' + filename +'.npy')
+		samples[idx] = np.load('labels/' + filename +'.npy')[-1]
 	return samples
 
 def categorical_focal_loss(alpha, gamma=2.):
@@ -237,7 +237,7 @@ class DataGenerator(keras.utils.Sequence):
 		# Initialization
 		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float16)
 #		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
-		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=int)
+		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
 
 		#print(list_IDs_temp)
 		# Generate data
@@ -259,7 +259,7 @@ class DataGenerator(keras.utils.Sequence):
 ##			ic(np.unique(label[...,1], return_counts=True))
 
 ##			pdb.set_trace()
-			#label = label[-1]
+			label = label[-1]
 			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
 			##pdb.set_trace()
 
@@ -336,7 +336,7 @@ def model_get(params):
 	print(model.summary())
 	return model
 
-def model_get(params):
+def BUnetConvLSTM_Nto1(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
 
@@ -499,8 +499,6 @@ if __name__ == "__main__":
 	partition = partition_get()
 #	class_weights = np.array([0.54569158, 5.97146725])
 	class_weights = np.array([0.53869264, 6.96117691]) # all is 1
-	class_weights = np.array([0.54175429, 6.48740847]) # all is 1
-
 
 #	class_weights = np.array([0.53869264, 2]) # all is 1
 	
@@ -513,7 +511,7 @@ if __name__ == "__main__":
 	print("partition['validation']",partition['validation'])
 	#pdb.set_trace()
 	##---------------- Model -------------------------------##
-	model = BUnetConvLSTM_NtoN(params)
+	model = BUnetConvLSTM_Nto1(params)
 
 
 	##---------------- Train -------------------------------##
@@ -523,8 +521,8 @@ if __name__ == "__main__":
 	test_generator = DataGenerator(partition['test'], partition['test'], **paramsTest)
 
 	
-	file_output='model.hdf5'
-	trainMode = True
+	file_output='model_Nto1.hdf5'
+	trainMode = False
 	if trainMode == True:
 		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',

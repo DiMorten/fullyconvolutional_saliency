@@ -13,10 +13,22 @@ train_list = ['bear', 'bmx-bumps', 'boat', 'breakdance-flare', 'bus', 'car-turn'
     'hike', 'hockey', 'horsejump-low', 'kite-walk', 'lucia', 'mallard-fly', 'mallard-water', 'motocross-bumps', 'motorbike', 'paragliding',
     'rhino', 'scooter-gray', 'soccerball', 'stroller', 'surf', 'swing', 'tennis', 'train']
 
+
 test_list = ['blackswan', 'bmx-trees', 'breakdance', 'camel', 'car-roundabout', 'car-shadow', 'cows', 'dance-twirl', 'dog', 'drift-chicane',
     'drift-straight', 'goat', 'horsejump-high', 'kite-surf', 'libby', 'motocross-jump', 'paragliding-launch', 'parkour', 'scooter-black',
     'soapbox']
 
+'''
+train_list = ['bear', 'bmx-bumps', 'boat', 'breakdance-flare', 'bus', 'car-turn', 'dance-jump', 'drift-turn', 'elephant', 'flamingo',
+    'hike', 'hockey', 'horsejump-low', 'kite-walk', 'lucia', 'mallard-fly', 'mallard-water', 'motocross-bumps', 'motorbike', 'paragliding',
+    'rhino', 'scooter-gray', 'soccerball', 'stroller', 'surf', 'swing', 'tennis', 'train','blackswan', 'bmx-trees', 'breakdance', 'camel', 'car-roundabout', 'car-shadow', 'cows', 'dance-twirl', 'dog', 'drift-chicane',
+    'drift-straight']
+
+test_list = ['goat', 'horsejump-high', 'kite-surf', 'libby', 'motocross-jump', 'paragliding-launch', 'parkour', 'scooter-black',
+    'soapbox']'''
+#test_list = ['blackswan', 'bmx-trees', 'breakdance', 'camel', 'car-roundabout', 'cows', 'dance-twirl', 'dog', 'drift-chicane',
+#    'drift-straight', 'goat', 'horsejump-high', 'kite-surf', 'libby', 'paragliding-launch', 'parkour', 'scooter-black',
+#    'soapbox']
 
 entire_list = train_list + test_list
 ic(entire_list)
@@ -35,6 +47,7 @@ def jpg_to_npy_video(path, spatial_dim):
         frame_names = frame_names[:max_len]
 #    ic(frame_names)
 #    ic(len(frame_names))
+    ic(len(frame_names))
     assert len(frame_names) == max_len
     
     np_video = np.zeros((len(frame_names), *spatial_dim, 3))
