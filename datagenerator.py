@@ -73,9 +73,9 @@ class DataGenerator(keras.utils.Sequence):
 	def __data_generation(self, list_IDs_temp):
 		'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
 		# Initialization
-		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float16)
+		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float32)
 #		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
-		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=int)
+		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=np.float32)
 
 		#print(list_IDs_temp)
 		# Generate data

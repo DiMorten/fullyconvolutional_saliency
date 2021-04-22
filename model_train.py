@@ -465,7 +465,7 @@ if __name__ == "__main__":
 #	class_weights = np.array([0.54569158, 5.97146725])
 	class_weights = np.array([0.53869264, 6.96117691]) # all is 1
 #	class_weights = np.array([0.54175429, 6.48740847]) # all is 1
-	class_weights = np.array([0.54248901, 6.38387407])
+	class_weights = np.array([0.54248901, 6.38387407]).astype(np.float32)
 
 	
 	#pdb.set_trace()
