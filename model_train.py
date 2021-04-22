@@ -21,6 +21,7 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score
 import joblib
 
 from monitor import Monitor
+from datagenerator import DataGenerator
 #run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
 def load_labels(partition, params):
 	samples = np.zeros((len(partition), *params['dim'] , params['n_classes']))
@@ -202,94 +203,6 @@ def mean_iou(y_true, y_pred):
         total_iou = total_iou + iou(y_true, y_pred, label)
     # divide total IoU by number of labels to get mean IoU
     return total_iou / num_labels
-class DataGenerator(keras.utils.Sequence):
-	'Generates data for Keras'
-	def __init__(self, list_IDs, labels, batch_size=6, dim=(20,128,128), label_dim=(128,128), n_channels=3,
-				 n_classes=2, shuffle=True, scaler=None):
-		'Initialization'
-		self.dim = dim
-		self.batch_size = batch_size
-		self.labels = labels
-		self.list_IDs = list_IDs
-		print("self.list_IDs",self.list_IDs)
-		self.n_channels = n_channels
-		self.n_classes = n_classes
-		self.shuffle = shuffle
-		self.label_dim = label_dim
-		self.scaler = scaler
-		self.on_epoch_end()
-
-	def __len__(self):
-		'Denotes the number of batches per epoch'
-		return int(np.floor(len(self.list_IDs) / self.batch_size))
-
-	def __getitem__(self, index):
-		'Generate one batch of data'
-		# Generate indexes of the batch
-#		print("Generating 1 batch...")
-		indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
-
-		# Find list of IDs
-		list_IDs_temp = [self.list_IDs[k] for k in indexes]
-
-		# Generate data
-		X, y = self.__data_generation(list_IDs_temp)
-
-		return X, y
-
-	def on_epoch_end(self):
-		'Updates indexes after each epoch'
-		self.indexes = np.arange(len(self.list_IDs))
-		print("EPOCH END",self.indexes)
-		if self.shuffle == True:
-			np.random.shuffle(self.indexes)
-
-	def scalerApply(self, X):
-		X_shape = X.shape
-		X = np.reshape(X, (-1, X_shape[-1]))
-		X = self.scaler.transform(X)
-		X = np.reshape(X, X_shape)
-		return X
-
-	def __data_generation(self, list_IDs_temp):
-		'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
-		# Initialization
-		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float16)
-#		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
-		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=int)
-
-		#print(list_IDs_temp)
-		# Generate data
-		for i, ID in enumerate(list_IDs_temp):
-			# Store sample
-
-			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
-
-#			ic(np.average(X[i]))
-			##ic(X[i].shape)
-			##cv2.imwrite("sample_input.png", X[i][-1].astype(np.int))
-
-			# Y[i] is configured as N-to-1. Its shape is (h, w) 
-			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
-			# 	That way, Y[i] shape will be (t, h, w)
-			label = np.load('labels/' + ID + '.npy')
-##			ic(np.unique(label, return_counts=True))
-##			ic(np.unique(label[...,0], return_counts=True))
-##			ic(np.unique(label[...,1], return_counts=True))
-
-##			pdb.set_trace()
-			#label = label[-1]
-			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
-			##pdb.set_trace()
-
-			Y[i] = label.astype(np.int)/255
-		#X = self.scalerApply(X)	
-		#ic(np.average(X), np.std(X))	
-		#pdb.set_trace()	
-
-
-		return X, Y
-
 
 def convolution_layer_over_time(x,filter_size,dilation_rate=1, kernel_size=3, weight_decay=1E-4):
 	x = TimeDistributed(Conv2D(filter_size, kernel_size, padding='same'))(x)
@@ -413,11 +326,43 @@ def BUnetConvLSTM_NtoN(params):
 	d1 = transpose_layer_over_time(d2,fs)
 	d1 = keras.layers.concatenate([d1, p1], axis=-1)
 	out=convolution_layer_over_time(d1,fs)
+	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='softmax',
+								padding='same'))(out)
+	model = Model(in_im, out)
+	print(model.summary())
+	return model
+
+def BUnetConvLSTM_Skip_NtoN(params):
+	in_im = Input(shape=(*params['dim'], params['n_channels']))
+	weight_decay=1E-4
+
+	fs=16
+	p1=convolution_layer_over_time(in_im,fs)			
+	p1=convolution_layer_over_time(p1,fs)
+	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
+	p2=convolution_layer_over_time(e1,fs*2)
+	e2 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p2)
+	p3=convolution_layer_over_time(e2,fs*4)
+	e3 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p3)
+
+	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=True,
+			padding="same"),merge_mode='concat')(e3)
+
+	d3 = transpose_layer_over_time(x,fs*4)
+	d3 = keras.layers.concatenate([d3, p3], axis=-1)
+	d3=convolution_layer_over_time(d3,fs*4)
+	d2 = transpose_layer_over_time(d3,fs*2)
+	d2 = keras.layers.concatenate([d2, p2], axis=-1)
+	d2=convolution_layer_over_time(d2,fs*2)
+	d1 = transpose_layer_over_time(d2,fs)
+	d1 = keras.layers.concatenate([d1, p1], axis=-1)
+	out=convolution_layer_over_time(d1,fs)
 	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='sigmoid',
 								padding='same'))(out)
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
+
 
 def BUnetConvLSTM_Skip_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
@@ -541,7 +486,7 @@ if __name__ == "__main__":
 
 	
 	file_output='model.hdf5'
-	trainMode = False
+	trainMode = True
 	if trainMode == True:
 		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',
@@ -549,7 +494,7 @@ if __name__ == "__main__":
 #					loss=categorical_focal_loss(gamma=2., alpha=.25),
 #					metrics=['accuracy', mean_iou])
 #					metrics=['accuracy', mean_iou])
-					metrics=['accuracy', f1_m])
+					metrics=['accuracy'])
 					
 
 #		es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=15, min_delta=0.001)
