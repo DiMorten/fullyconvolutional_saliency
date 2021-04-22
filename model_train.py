@@ -8,7 +8,7 @@ import csv
 import threading
 import keras
 from keras.layers import Input, Dense, Conv2D, MaxPool2D, Flatten, Dropout, Conv2DTranspose, ConvLSTM2D, Activation, BatchNormalization, Bidirectional, TimeDistributed, AveragePooling2D
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.regularizers import l1,l2
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping
@@ -17,7 +17,13 @@ from icecream import ic
 import sys
 from keras import backend as K
 from keras import metrics
+
 #run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
+def load_labels(partition, params):
+	samples = np.zeros((len(partition), params[''] ))
+	for filename in partition:
+		ic(filename)
+		sample = np.load('labels/' + filename)
 
 def binary_focal_loss(gamma=2., alpha=.25):
     """
@@ -400,17 +406,18 @@ if __name__ == "__main__":
 	validation_generator = DataGenerator(partition['validation'], partition['validation'], **params)
 	test_generator = DataGenerator(partition['test'], partition['test'], **params)
 
-	model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
+	
+	file_output='model.hdf5'
+	trainMode = True
+	if trainMode == True:
+		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',
 					loss=weighted_categorical_crossentropy(class_weights),
 #					metrics=['accuracy', mean_iou])
 					metrics=['accuracy', mean_iou])
 
-	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5, min_delta=0.001)
+		es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=15, min_delta=0.001)
 
-	file_output='model.hdf5'
-	trainMode = True
-	if trainMode == True:
 		# Train model on dataset
 		history = model.fit_generator(generator=training_generator,
 							epochs=100,
@@ -420,11 +427,15 @@ if __name__ == "__main__":
 							callbacks=[es])
 		model.save(file_output)
 	else:
-		model.load(file_output)
+		model = load_model(file_output)
 	metrics_evaluated = model.evaluate_generator(test_generator)
 	print('Test accuracy :', metrics_evaluated)
 
 	predictions = model.predict_generator(test_generator)
+
+	labels = load_labels(partition['test'])
+
+
 	ic(predictions.shape)
 	
 	ic(np.unique(predictions, return_counts=True))
