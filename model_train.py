@@ -520,11 +520,8 @@ if __name__ == "__main__":
 #	class_weights = np.array([0.54569158, 5.97146725])
 	class_weights = np.array([0.53869264, 6.96117691]) # all is 1
 #	class_weights = np.array([0.54175429, 6.48740847]) # all is 1
+	class_weights = np.array([0.54248901, 6.38387407])
 
-
-#	class_weights = np.array([0.53869264, 2]) # all is 1
-	
-#	class_weights = np.array([1, 1])
 	
 	#pdb.set_trace()
 	
@@ -544,7 +541,7 @@ if __name__ == "__main__":
 
 	
 	file_output='model.hdf5'
-	trainMode = True
+	trainMode = False
 	if trainMode == True:
 		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',
@@ -579,6 +576,7 @@ if __name__ == "__main__":
 	
 	ic(labels.shape)
 	ic(predictions.shape)
+	# get metrics
 	labels_flat = labels.argmax(axis=-1).flatten()
 	predictions_flat = predictions.argmax(axis=-1).flatten()
 	report = classification_report(labels_flat,predictions_flat)
@@ -587,9 +585,20 @@ if __name__ == "__main__":
 	ic(np.unique(predictions, return_counts=True))
 	ic(np.unique(predictions_flat, return_counts=True))
 
+	# save to img
+	
 	for idx, name in enumerate(partition['test']):
 		for frame_id in range(t_len):
-			frame_prediction = predictions.argmax(axis=-1)[idx, frame_id].astype(np.uint8)*255
-			#ic(frame_prediction.shape)
-			cv2.imwrite('sample/'+name+str(frame_id)+'.png', frame_prediction)
+			frame = predictions.argmax(axis=-1)[idx, frame_id].astype(np.uint8)*255
+			#ic(frame.shape)
+			path = 'sample/prediction/'
+			Path(path).mkdir(parents=True, exist_ok=True)
+			cv2.imwrite(path+name+str(frame_id)+'.png', frame)
+	for idx, name in enumerate(partition['test']):
+		for frame_id in range(t_len):
+			frame = labels.argmax(axis=-1)[idx, frame_id].astype(np.uint8)*255
+			#ic(frame.shape)
+			path = 'sample/label/'
+			Path(path).mkdir(parents=True, exist_ok=True)			
+			cv2.imwrite(path+name+str(frame_id)+'.png', frame)
 	pdb.set_trace()
