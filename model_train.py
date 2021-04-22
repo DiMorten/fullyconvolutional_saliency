@@ -14,8 +14,50 @@ from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping
 import tensorflow as tf
 from icecream import ic
-run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
+import sys
+from keras import backend as K
+#run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
 
+def binary_focal_loss(gamma=2., alpha=.25):
+    """
+    Binary form of focal loss.
+      FL(p_t) = -alpha * (1 - p_t)**gamma * log(p_t)
+      where p = sigmoid(x), p_t = p or 1 - p depending on if the label is 1 or 0, respectively.
+    References:
+        https://arxiv.org/pdf/1708.02002.pdf
+    Usage:
+     model.compile(loss=[binary_focal_loss(alpha=.25, gamma=2)], metrics=["accuracy"], optimizer=adam)
+    """
+
+    def binary_focal_loss_fixed(y_true, y_pred):
+        """
+        :param y_true: A tensor of the same shape as `y_pred`
+        :param y_pred:  A tensor resulting from a sigmoid
+        :return: Output tensor.
+        """
+        y_true = tf.cast(y_true, tf.float32)
+        # Define epsilon so that the back-propagation will not result in NaN for 0 divisor case
+        epsilon = K.epsilon()
+        # Add the epsilon to prediction value
+        # y_pred = y_pred + epsilon
+        # Clip the prediciton value
+        y_pred = K.clip(y_pred, epsilon, 1.0 - epsilon)
+        # Calculate p_t
+        p_t = tf.where(K.equal(y_true, 1), y_pred, 1 - y_pred)
+        # Calculate alpha_t
+        alpha_factor = K.ones_like(y_true) * alpha
+        alpha_t = tf.where(K.equal(y_true, 1), alpha_factor, 1 - alpha_factor)
+        # Calculate cross entropy
+        cross_entropy = -K.log(p_t)
+        weight = alpha_t * K.pow((1 - p_t), gamma)
+        # Calculate focal loss
+        loss = weight * cross_entropy
+        # Sum the losses in mini_batch
+        loss = K.mean(K.sum(loss, axis=1))
+        return loss
+
+    return binary_focal_loss_fixed
+	
 class DataGenerator(keras.utils.Sequence):
 	'Generates data for Keras'
 	def __init__(self, list_IDs, labels, batch_size=6, dim=(20,128,128), label_dim=(128,128), n_channels=3,
@@ -69,14 +111,23 @@ class DataGenerator(keras.utils.Sequence):
 			# Store sample
 
 			X[i,] = np.load('data/' + ID + '.npy')
+			ic(X[i].shape)
+			cv2.imwrite("sample_input.png", X[i][-1].astype(np.int))
 
-			# Store class
-			#print(ID)
-			#print(np.load('labels/' + ID + '.npy')[-1].shape)
-			Y[i,] = np.load('labels/' + ID + '.npy')[-1].astype(np.int)/255 # Only last frame is segmented
+			# Y[i] is configured as N-to-1. Its shape is (h, w) 
+			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
+			# 	That way, Y[i] shape will be (t, h, w)
+			label = np.load('labels/' + ID + '.npy')
 
-		#return X, keras.utils.to_categorical(Y, num_classes=self.n_classes)
-		return X, np.expand_dims(Y, axis=3)
+			label = label[-1]
+			cv2.imwrite("sample_label.png", label.astype(np.int))
+			pdb.set_trace()
+
+			Y[i] = label.astype(np.int)/255
+			
+
+
+		return X, np.expand_dims(Y, axis=-1)
 
 
 def convolution_layer_over_time(x,filter_size,dilation_rate=1, kernel_size=3, weight_decay=1E-4):
@@ -99,6 +150,14 @@ def transpose_layer(x,filter_size,dilation_rate=1,
 										beta_regularizer=l2(weight_decay))(x)
 	x = Activation('relu')(x)
 	return x	
+def transpose_layer_over_time(x,filter_size,dilation_rate=1, 
+	kernel_size=3, strides=(2,2), weight_decay=1E-4):
+	x = TimeDistributed(Conv2DTranspose(filter_size, 
+		kernel_size, strides=strides, padding='same'))(x)
+	x = BatchNormalization(gamma_regularizer=l2(weight_decay),
+										beta_regularizer=l2(weight_decay))(x)
+	x = Activation('relu')(x)
+	return x	
 
 
 def model_get(params):
@@ -117,6 +176,24 @@ def model_get(params):
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
+
+
+def model_get(params):
+	in_im = Input(shape=(*params['dim'], params['n_channels']))
+	weight_decay=1E-4
+
+	fs=16
+
+
+	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=False,
+			padding="same"),merge_mode='concat')(in_im)
+
+	out = Conv2D(1, (1, 1), activation='sigmoid',
+								padding='same')(x)
+	model = Model(in_im, out)
+	print(model.summary())
+	return model
+
 def model_get(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
@@ -160,29 +237,36 @@ def read_dict(path):
 def train_test_split(partition_train, validation_size=5):
 	print(partition_train)
 	train_len = len(partition_train)
-	partition_train_new=partition_train[:validation_size]
-	partition_validation=partition_train[validation_size:]
+	partition_validation=partition_train[:validation_size]
+	partition_train_new=partition_train[validation_size:]
 	return partition_train_new, partition_validation
 
 def partition_get():
 	partition={}
-	sample_names_train = glob.glob(os.path.join('data/train/input_/*.npy'))
-	sample_names = [x.replace("data/train/input_/","").replace(".npy","") for x in sample_names]
-	print(sample_names)
 
-	partition['train'] = sample_names[:30]
-	partition['test'] = sample_names[30:]
 
-	print(partition['train'],partition['test'])
+	partition['train'] = ['bear', 'bmx-bumps', 'boat', 'breakdance-flare', 'bus', 'car-turn', 'dance-jump', 'drift-turn', 'elephant', 'flamingo',
+    'hike', 'hockey', 'horsejump-low', 'kite-walk', 'lucia', 'mallard-fly', 'mallard-water', 'motocross-bumps', 'motorbike', 'paragliding',
+    'rhino', 'scooter-gray', 'soccerball', 'stroller', 'surf', 'swing', 'tennis', 'train']
+
+	partition['test'] = ['blackswan', 'bmx-trees', 'breakdance', 'camel', 'car-roundabout', 'car-shadow', 'cows', 'dance-twirl', 'dog', 'drift-chicane',
+		'drift-straight', 'goat', 'horsejump-high', 'kite-surf', 'libby', 'motocross-jump', 'paragliding-launch', 'parkour', 'scooter-black',
+		'soapbox']
+
+	ic(partition['train'])
+	ic(partition['test'])
 
 	partition['train'], partition['validation'] = train_test_split(partition['train'], validation_size=5)
+	ic(partition['validation'])
 
 	return partition
+
 if __name__ == "__main__":
 	##---------------- Parameters --------------------------##
 	im_len=128
+	t_len = 20 # it may be 20 later
 	params = {
-			'dim': (20,im_len,im_len),
+			'dim': (t_len,im_len,im_len),
 			'label_dim': (im_len,im_len),
 			'batch_size': 4,
 			'n_classes': 2,
@@ -203,14 +287,32 @@ if __name__ == "__main__":
 
 	training_generator = DataGenerator(partition['train'], partition['train'], **params)
 	validation_generator = DataGenerator(partition['validation'], partition['validation'], **params)
+	test_generator = DataGenerator(partition['test'], partition['test'], **params)
 
 	model.compile(optimizer=Adam(lr=0.01, decay=0.00016667),
-					loss='binary_crossentropy',
-					metrics=['accuracy'], options = run_opts)
-	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
-	# Train model on dataset
-	model.fit_generator(generator=training_generator,
-						validation_data=validation_generator,
-						use_multiprocessing=True,
-						workers=9, 
-						callbacks=[es])
+					#loss='binary_crossentropy',
+					loss=binary_focal_loss(alpha=.25, gamma=2),
+					metrics=['accuracy'])
+	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10, min_delta=0.001)
+
+	file_output='model.hdf5'
+	trainMode = True
+	if trainMode == True:
+		# Train model on dataset
+		history = model.fit_generator(generator=training_generator,
+							epochs=100,
+							validation_data=validation_generator,
+	#						use_multiprocessing=True,
+	#						workers=9, 
+							callbacks=[es])
+		model.save(file_output)
+	else:
+		model.load(file_output)
+	loss, accuracy = model.evaluate_generator(test_generator)
+	print('Test accuracy :', accuracy)
+
+	predictions = model.predict_generator(test_generator)
+	ic(predictions.shape)
+	
+	np.unique(predictions)
+	pdb.set_trace()
