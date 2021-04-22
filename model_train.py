@@ -16,6 +16,7 @@ import tensorflow as tf
 from icecream import ic
 import sys
 from keras import backend as K
+from keras import metrics
 #run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
 
 def binary_focal_loss(gamma=2., alpha=.25):
@@ -57,7 +58,75 @@ def binary_focal_loss(gamma=2., alpha=.25):
         return loss
 
     return binary_focal_loss_fixed
-	
+
+def weighted_categorical_crossentropy(weights):
+    """
+    A weighted version of keras.objectives.categorical_crossentropy
+    
+    Variables:
+        weights: numpy array of shape (C,) where C is the number of classes
+    
+    Usage:
+        weights = np.array([0.5,2,10]) # Class one at 0.5, class 2 twice the normal weights, class 3 10x.
+        loss = weighted_categorical_crossentropy(weights)
+        model.compile(loss=loss,optimizer='adam')
+    """
+    
+    weights = K.variable(weights)
+        
+    def loss(y_true, y_pred):
+        # scale predictions so that the class probas of each sample sum to 1
+        y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+        # clip to prevent NaN's and Inf's
+        y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
+        # calc
+        loss = y_true * K.log(y_pred) * weights
+        loss = -K.sum(loss, -1)
+        return loss
+    
+    return loss
+
+def iou(y_true, y_pred, label: int):
+    """
+    Return the Intersection over Union (IoU) for a given label.
+    Args:
+        y_true: the expected y values as a one-hot
+        y_pred: the predicted y values as a one-hot or softmax output
+        label: the label to return the IoU for
+    Returns:
+        the IoU for the given label
+    """
+    # extract the label values using the argmax operator then
+    # calculate equality of the predictions and truths to the label
+    y_true = K.cast(K.equal(K.argmax(y_true), label), K.floatx())
+    y_pred = K.cast(K.equal(K.argmax(y_pred), label), K.floatx())
+    # calculate the |intersection| (AND) of the labels
+    intersection = K.sum(y_true * y_pred)
+    # calculate the |union| (OR) of the labels
+    union = K.sum(y_true) + K.sum(y_pred) - intersection
+    # avoid divide by zero - if the union is zero, return 1
+    # otherwise, return the intersection over union
+    return K.switch(K.equal(union, 0), 1.0, intersection / union)
+
+
+def mean_iou(y_true, y_pred):
+    """
+    Return the Intersection over Union (IoU) score.
+    Args:
+        y_true: the expected y values as a one-hot
+        y_pred: the predicted y values as a one-hot or softmax output
+    Returns:
+        the scalar IoU value (mean over all labels)
+    """
+    # get number of labels to calculate IoU for
+    num_labels = K.int_shape(y_pred)[-1]
+    # initialize a variable to store total IoU in
+    total_iou = K.variable(0)
+    # iterate over labels to calculate IoU for
+    for label in range(num_labels):
+        total_iou = total_iou + iou(y_true, y_pred, label)
+    # divide total IoU by number of labels to get mean IoU
+    return total_iou / num_labels
 class DataGenerator(keras.utils.Sequence):
 	'Generates data for Keras'
 	def __init__(self, list_IDs, labels, batch_size=6, dim=(20,128,128), label_dim=(128,128), n_channels=3,
@@ -103,7 +172,7 @@ class DataGenerator(keras.utils.Sequence):
 		'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
 		# Initialization
 		X = np.empty((self.batch_size, *self.dim, self.n_channels))
-		Y = np.empty((self.batch_size, *self.label_dim), dtype=int)
+		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
 
 		#print(list_IDs_temp)
 		# Generate data
@@ -111,8 +180,8 @@ class DataGenerator(keras.utils.Sequence):
 			# Store sample
 
 			X[i,] = np.load('data/' + ID + '.npy')
-			ic(X[i].shape)
-			cv2.imwrite("sample_input.png", X[i][-1].astype(np.int))
+			##ic(X[i].shape)
+			##cv2.imwrite("sample_input.png", X[i][-1].astype(np.int))
 
 			# Y[i] is configured as N-to-1. Its shape is (h, w) 
 			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
@@ -120,14 +189,14 @@ class DataGenerator(keras.utils.Sequence):
 			label = np.load('labels/' + ID + '.npy')
 
 			label = label[-1]
-			cv2.imwrite("sample_label.png", label.astype(np.int))
-			pdb.set_trace()
+			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
+			##pdb.set_trace()
 
 			Y[i] = label.astype(np.int)/255
 			
 
 
-		return X, np.expand_dims(Y, axis=-1)
+		return X, Y
 
 
 def convolution_layer_over_time(x,filter_size,dilation_rate=1, kernel_size=3, weight_decay=1E-4):
@@ -199,7 +268,6 @@ def model_get(params):
 	weight_decay=1E-4
 
 	fs=16
-
 	p1=convolution_layer_over_time(in_im,fs)			
 	p1=convolution_layer_over_time(p1,fs)
 	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
@@ -220,7 +288,7 @@ def model_get(params):
 	d1 = transpose_layer(d2,fs)
 	#d1 = keras.layers.concatenate([d1, p1], axis=4)
 	out=convolution_layer(d1,fs)
-	out = Conv2D(1, (1, 1), activation='sigmoid',
+	out = Conv2D(params['n_classes'], (1, 1), activation='sigmoid',
 								padding='same')(out)
 	model = Model(in_im, out)
 	print(model.summary())
@@ -274,6 +342,7 @@ if __name__ == "__main__":
 			'shuffle': True}
 	##---------------- Dataset -----------------------------##
 	partition = partition_get()
+	class_weights = np.array([0.54569158, 5.97146725])
 	#pdb.set_trace()
 	
 	print("Train len: ",len(partition['train']), "Validation len: ",len(partition['validation']))
@@ -291,8 +360,8 @@ if __name__ == "__main__":
 
 	model.compile(optimizer=Adam(lr=0.01, decay=0.00016667),
 					#loss='binary_crossentropy',
-					loss=binary_focal_loss(alpha=.25, gamma=2),
-					metrics=['accuracy'])
+					loss=weighted_categorical_crossentropy(class_weights),
+					metrics=['accuracy', mean_iou])
 	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10, min_delta=0.001)
 
 	file_output='model.hdf5'
@@ -308,11 +377,13 @@ if __name__ == "__main__":
 		model.save(file_output)
 	else:
 		model.load(file_output)
-	loss, accuracy = model.evaluate_generator(test_generator)
-	print('Test accuracy :', accuracy)
+	metrics_evaluated = model.evaluate_generator(test_generator)
+	print('Test accuracy :', metrics_evaluated)
 
 	predictions = model.predict_generator(test_generator)
 	ic(predictions.shape)
 	
-	np.unique(predictions)
+	np.unique(predictions, return_counts=True)
+	np.unique(predictions.argmax(axis=-1), return_counts=True)
+
 	pdb.set_trace()

@@ -70,10 +70,14 @@ for sample_name in entire_list:
         ic(np.min(input_), np.median(input_), np.average(input_), np.max(input_))
         ic(np.min(label), np.median(label), np.average(label), np.max(label))
 #        ic(np.unique(label, return_counts=True))
-        label[...,1] = 255 - label[...,1]  # take only one channel makes it grayscale
+        label[...,1] = 255 - label[...,0]  # take only one channel makes it grayscale
         label = label[...,:-1]
+
+
         ic(input_.shape)
         ic(label.shape)
+#        ic(np.unique(label[...,0], return_counts=True))
+#        ic(np.unique(label[...,1], return_counts=True))
 #        ic(np.unique(label, return_counts=True))
 #        pdb.set_trace()
         np.save(input_save_path / (sample_name+'.npy'), input_)
