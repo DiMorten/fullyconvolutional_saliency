@@ -17,9 +17,10 @@ from icecream import ic
 import sys
 from keras import backend as K
 from keras import metrics
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 import joblib
 
+from monitor import Monitor
 #run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom = False)
 def load_labels(partition, params):
 	samples = np.zeros((len(partition), *params['dim'] , params['n_classes']))
@@ -142,6 +143,24 @@ def weighted_categorical_crossentropy(weights):
     
     return loss
 
+def recall_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + K.epsilon())
+    return recall
+
+def precision_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + K.epsilon())
+    return precision
+
+def f1_m(y_true, y_pred):
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
+#	return f1_score(y_true, y_pred, average='macro')
+
 def iou(y_true, y_pred, label: int):
     """
     Return the Intersection over Union (IoU) for a given label.
@@ -244,7 +263,7 @@ class DataGenerator(keras.utils.Sequence):
 		for i, ID in enumerate(list_IDs_temp):
 			# Store sample
 
-			X[i,] = np.load('data/' + ID + '.npy').astype(np.float16) #/128
+			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
 
 #			ic(np.average(X[i]))
 			##ic(X[i].shape)
@@ -264,7 +283,7 @@ class DataGenerator(keras.utils.Sequence):
 			##pdb.set_trace()
 
 			Y[i] = label.astype(np.int)/255
-		X = self.scalerApply(X)	
+		#X = self.scalerApply(X)	
 		#ic(np.average(X), np.std(X))	
 		#pdb.set_trace()	
 
@@ -372,7 +391,7 @@ def BUnetConvLSTM_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
 
-	fs=32
+	fs=16
 	p1=convolution_layer_over_time(in_im,fs)			
 	p1=convolution_layer_over_time(p1,fs)
 	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
@@ -383,7 +402,8 @@ def BUnetConvLSTM_NtoN(params):
 
 	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=True,
 			padding="same"),merge_mode='concat')(e3)
-
+#	x = TimeDistributed(Conv2D(64, (1, 1), activation='relu',
+#								padding='same'))(e3)
 	d3 = transpose_layer_over_time(x,fs*4)
 	d3 = keras.layers.concatenate([d3, p3], axis=-1)
 	d3=convolution_layer_over_time(d3,fs*4)
@@ -403,7 +423,7 @@ def BUnetConvLSTM_Skip_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
 
-	fs=32
+	fs=16
 	p1=convolution_layer_over_time(in_im,fs)			
 	p1=convolution_layer_over_time(p1,fs)
 	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
@@ -475,7 +495,7 @@ def partition_get():
 	ic(partition['train'])
 	ic(partition['test'])
 
-	partition['train'], partition['validation'] = train_test_split(partition['train'], validation_size=5)
+	partition['train'], partition['validation'] = train_test_split(partition['train'], validation_size=4)
 	ic(partition['validation'])
 
 	return partition
@@ -499,7 +519,7 @@ if __name__ == "__main__":
 	partition = partition_get()
 #	class_weights = np.array([0.54569158, 5.97146725])
 	class_weights = np.array([0.53869264, 6.96117691]) # all is 1
-	class_weights = np.array([0.54175429, 6.48740847]) # all is 1
+#	class_weights = np.array([0.54175429, 6.48740847]) # all is 1
 
 
 #	class_weights = np.array([0.53869264, 2]) # all is 1
@@ -531,17 +551,21 @@ if __name__ == "__main__":
 					loss=weighted_categorical_crossentropy(class_weights),
 #					loss=categorical_focal_loss(gamma=2., alpha=.25),
 #					metrics=['accuracy', mean_iou])
-					metrics=['accuracy', mean_iou])
+#					metrics=['accuracy', mean_iou])
+					metrics=['accuracy', f1_m])
+					
 
-		es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=15, min_delta=0.001)
+#		es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=15, min_delta=0.001)
+		es = EarlyStopping(monitor='val_f1_m', mode='max', verbose=1, patience=15, min_delta=0.001)
+#		es = EarlyStopping(monitor='val_mean_iou', mode='max', verbose=1, patience=15, min_delta=0.001)
 
 		# Train model on dataset
 		history = model.fit_generator(generator=training_generator,
 							epochs=100,
 							validation_data=validation_generator,
-	#						use_multiprocessing=True,
-	#						workers=9, 
-							callbacks=[es])
+#							callbacks=[es])
+							callbacks = [Monitor(validation=validation_generator,patience = 15,
+												classes=2)]) 
 		model.save(file_output)
 		metrics_evaluated = model.evaluate_generator(test_generator)
 		print('Test accuracy :', metrics_evaluated)
