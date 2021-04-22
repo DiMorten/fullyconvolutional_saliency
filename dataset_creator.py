@@ -70,7 +70,8 @@ for sample_name in entire_list:
         ic(np.min(input_), np.median(input_), np.average(input_), np.max(input_))
         ic(np.min(label), np.median(label), np.average(label), np.max(label))
 #        ic(np.unique(label, return_counts=True))
-        label[...,1] = 255 - label[...,0]  # take only one channel makes it grayscale
+        label[...,1] = label[...,0].copy()  # take only one channel makes it grayscale
+        label[...,0] = 255 - label[...,0]
         label = label[...,:-1]
 
 

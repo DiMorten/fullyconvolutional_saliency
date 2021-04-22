@@ -171,15 +171,17 @@ class DataGenerator(keras.utils.Sequence):
 	def __data_generation(self, list_IDs_temp):
 		'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
 		# Initialization
-		X = np.empty((self.batch_size, *self.dim, self.n_channels))
-		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
+		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float16)
+#		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
+		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=int)
 
 		#print(list_IDs_temp)
 		# Generate data
 		for i, ID in enumerate(list_IDs_temp):
 			# Store sample
 
-			X[i,] = np.load('data/' + ID + '.npy')
+			X[i,] = np.load('data/' + ID + '.npy').astype(np.float16)/128
+#			ic(np.average(X[i]))
 			##ic(X[i].shape)
 			##cv2.imwrite("sample_input.png", X[i][-1].astype(np.int))
 
@@ -187,8 +189,12 @@ class DataGenerator(keras.utils.Sequence):
 			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
 			# 	That way, Y[i] shape will be (t, h, w)
 			label = np.load('labels/' + ID + '.npy')
+##			ic(np.unique(label, return_counts=True))
+##			ic(np.unique(label[...,0], return_counts=True))
+##			ic(np.unique(label[...,1], return_counts=True))
 
-			label = label[-1]
+##			pdb.set_trace()
+			#label = label[-1]
 			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
 			##pdb.set_trace()
 
@@ -295,6 +301,37 @@ def model_get(params):
 	return model
 
 
+def model_get(params):
+	in_im = Input(shape=(*params['dim'], params['n_channels']))
+	weight_decay=1E-4
+
+	fs=16
+	p1=convolution_layer_over_time(in_im,fs)			
+	p1=convolution_layer_over_time(p1,fs)
+	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
+	p2=convolution_layer_over_time(e1,fs*2)
+	e2 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p2)
+	p3=convolution_layer_over_time(e2,fs*4)
+	e3 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p3)
+
+	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=True,
+			padding="same"),merge_mode='concat')(e3)
+
+	d3 = transpose_layer_over_time(x,fs*4)
+	#d3 = keras.layers.concatenate([d3, p3], axis=4)
+	d3=convolution_layer_over_time(d3,fs*4)
+	d2 = transpose_layer_over_time(d3,fs*2)
+	#d2 = keras.layers.concatenate([d2, p2], axis=4)
+	d2=convolution_layer_over_time(d2,fs*2)
+	d1 = transpose_layer_over_time(d2,fs)
+	#d1 = keras.layers.concatenate([d1, p1], axis=4)
+	out=convolution_layer_over_time(d1,fs)
+	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='sigmoid',
+								padding='same'))(out)
+	model = Model(in_im, out)
+	print(model.summary())
+	return model
+
 
 def read_dict(path):
 	'Reads Python dictionary stored in a csv file'
@@ -342,7 +379,12 @@ if __name__ == "__main__":
 			'shuffle': True}
 	##---------------- Dataset -----------------------------##
 	partition = partition_get()
-	class_weights = np.array([0.54569158, 5.97146725])
+#	class_weights = np.array([0.54569158, 5.97146725])
+	class_weights = np.array([0.53869264, 6.96117691]) # all is 1
+#	class_weights = np.array([0.53869264, 2]) # all is 1
+	
+#	class_weights = np.array([1, 1])
+	
 	#pdb.set_trace()
 	
 	print("Train len: ",len(partition['train']), "Validation len: ",len(partition['validation']))
@@ -358,11 +400,13 @@ if __name__ == "__main__":
 	validation_generator = DataGenerator(partition['validation'], partition['validation'], **params)
 	test_generator = DataGenerator(partition['test'], partition['test'], **params)
 
-	model.compile(optimizer=Adam(lr=0.01, decay=0.00016667),
+	model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',
 					loss=weighted_categorical_crossentropy(class_weights),
+#					metrics=['accuracy', mean_iou])
 					metrics=['accuracy', mean_iou])
-	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10, min_delta=0.001)
+
+	es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5, min_delta=0.001)
 
 	file_output='model.hdf5'
 	trainMode = True
@@ -383,7 +427,7 @@ if __name__ == "__main__":
 	predictions = model.predict_generator(test_generator)
 	ic(predictions.shape)
 	
-	np.unique(predictions, return_counts=True)
-	np.unique(predictions.argmax(axis=-1), return_counts=True)
+	ic(np.unique(predictions, return_counts=True))
+	ic(np.unique(predictions.argmax(axis=-1), return_counts=True))
 
 	pdb.set_trace()
