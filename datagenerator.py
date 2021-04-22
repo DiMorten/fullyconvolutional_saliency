@@ -102,7 +102,7 @@ class DataGenerator(keras.utils.Sequence):
 			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
 			##pdb.set_trace()
 
-			Y[i] = label.astype(np.int)/255
+			Y[i] = label.astype(np.float32)/255.
 #		X = self.scalerApply(X)	
 		#ic(np.average(X), np.std(X))	
 		#pdb.set_trace()	
