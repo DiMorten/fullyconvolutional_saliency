@@ -83,8 +83,8 @@ class DataGenerator(keras.utils.Sequence):
 		for i, ID in enumerate(list_IDs_temp):
 			# Store sample
 
-#			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
-			X_image = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+###			X_image = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
 
 #			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)
 
@@ -95,15 +95,15 @@ class DataGenerator(keras.utils.Sequence):
 			# Y[i] is configured as N-to-1. Its shape is (h, w) 
 			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
 			# 	That way, Y[i] shape will be (t, h, w)
-			label = np.load('labels/' + ID + '.npy')
-
-			Y[i] = label.astype(np.float32)/255.
-			y = Y[i].copy()
-			band = np.expand_dims(y[...,1],axis=-1)
+###			label = np.load('labels/' + ID + '.npy')
+			Y[i] = np.load('labels/' + ID + '.npy').astype(np.float32)/255.
+###			Y[i] = label.astype(np.float32)/255.
+###			y = Y[i].copy()
+###			band = np.expand_dims(y[...,1],axis=-1)
 #			X[i] = np.concatenate((band, band, band), axis=-1)
 
-			band[1:-1] = 0.
-			X[i] = np.concatenate((X_image, band), axis=-1)
+###			band[1:-1] = 0.
+###			X[i] = np.concatenate((X_image, band), axis=-1)
 
 #			X[i][5] = 0.
 

@@ -457,8 +457,8 @@ if __name__ == "__main__":
 			'label_dim': (im_len,im_len),
 			'batch_size': 4,
 			'n_classes': 2,
-#			'n_channels': 3,
-			'n_channels': 4,
+			'n_channels': 3,
+#			'n_channels': 4,
 
 			'shuffle': True,
 			'scaler' : scaler}
@@ -491,9 +491,9 @@ if __name__ == "__main__":
 
 	
 	file_output='model.hdf5'
-	trainMode = False
+	trainMode = True
 	if trainMode == True:
-		model.compile(optimizer=Adam(lr=0.0001, decay=0.00016667),
+		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
 					#loss='binary_crossentropy',
 					loss=weighted_categorical_crossentropy(class_weights),
 #					loss=categorical_focal_loss(gamma=2., alpha=.25),

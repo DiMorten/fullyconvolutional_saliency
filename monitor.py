@@ -123,13 +123,10 @@ class Monitor(Callback):
             # Record the best weights if current results is better (less).
             self.best_weights = self.model.get_weights()
 
-            save_np_sample_as_png(val_targ[0].argmax(axis=-1).astype(np.uint8)*255, 'targ')
-            save_np_sample_as_png(val_pred[0].argmax(axis=-1).astype(np.uint8)*255, 'pred')
-#            ic(val_input.shape)
-#            ic(val_input[0].shape)
-
-#            save_np_sample_as_png((val_input[0]*255.).astype(np.uint8), 'input')
-            save_np_sample_as_png((val_input[0, ..., :-1]*255.).astype(np.uint8), 'input')            
+            #save_np_sample_as_png(val_targ[0].argmax(axis=-1).astype(np.uint8)*255, 'targ')
+            #save_np_sample_as_png(val_pred[0].argmax(axis=-1).astype(np.uint8)*255, 'pred')
+            #save_np_sample_as_png((val_input[0]*255.).astype(np.uint8), 'input')
+###            save_np_sample_as_png((val_input[0, ..., :-1]*255.).astype(np.uint8), 'input')            
 #            input_ = scalerInverseApply(val_input[0], self.scaler).astype(np.uint8)
 
 #            save_np_sample_as_png(input_, 'input')
