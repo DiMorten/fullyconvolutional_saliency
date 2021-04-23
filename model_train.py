@@ -457,11 +457,14 @@ if __name__ == "__main__":
 			'label_dim': (im_len,im_len),
 			'batch_size': 4,
 			'n_classes': 2,
-			'n_channels': 3,
+#			'n_channels': 3,
+			'n_channels': 4,
+
 			'shuffle': True,
 			'scaler' : scaler}
 	paramsTest = params.copy()
 	paramsTest['batch_size']=1
+	paramsTest['shuffle'] = False
 	##---------------- Dataset -----------------------------##
 	partition = partition_get()
 #	class_weights = np.array([0.54569158, 5.97146725])
@@ -488,7 +491,7 @@ if __name__ == "__main__":
 
 	
 	file_output='model.hdf5'
-	trainMode = True
+	trainMode = False
 	if trainMode == True:
 		model.compile(optimizer=Adam(lr=0.0001, decay=0.00016667),
 					#loss='binary_crossentropy',

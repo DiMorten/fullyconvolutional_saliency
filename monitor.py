@@ -30,6 +30,8 @@ def save_np_sample_as_png(sample, name_id=''):
         path = 'val_sample/'
         Path(path).mkdir(parents=True, exist_ok=True)
         cv2.imwrite(path+'val_sample'+name_id+str(frame_id)+'.png', frame)
+
+
 def scalerInverseApply(X, scaler):
     X_shape = X.shape
     X = np.reshape(X, (-1, X_shape[-1]))
@@ -123,7 +125,11 @@ class Monitor(Callback):
 
             save_np_sample_as_png(val_targ[0].argmax(axis=-1).astype(np.uint8)*255, 'targ')
             save_np_sample_as_png(val_pred[0].argmax(axis=-1).astype(np.uint8)*255, 'pred')
-            save_np_sample_as_png((val_input[0]*255.).astype(np.uint8), 'input')
+#            ic(val_input.shape)
+#            ic(val_input[0].shape)
+
+#            save_np_sample_as_png((val_input[0]*255.).astype(np.uint8), 'input')
+            save_np_sample_as_png((val_input[0, ..., :-1]*255.).astype(np.uint8), 'input')            
 #            input_ = scalerInverseApply(val_input[0], self.scaler).astype(np.uint8)
 
 #            save_np_sample_as_png(input_, 'input')

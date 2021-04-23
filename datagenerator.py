@@ -73,6 +73,7 @@ class DataGenerator(keras.utils.Sequence):
 	def __data_generation(self, list_IDs_temp):
 		'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
 		# Initialization
+#		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float32)
 		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float32)
 #		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
 		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=np.float32)
@@ -82,7 +83,9 @@ class DataGenerator(keras.utils.Sequence):
 		for i, ID in enumerate(list_IDs_temp):
 			# Store sample
 
-			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+#			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+			X_image = np.load('data/' + ID + '.npy').astype(np.float32)/255.0
+
 #			X[i,] = np.load('data/' + ID + '.npy').astype(np.float32)
 
 #			ic(np.average(X[i]))
@@ -93,6 +96,17 @@ class DataGenerator(keras.utils.Sequence):
 			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
 			# 	That way, Y[i] shape will be (t, h, w)
 			label = np.load('labels/' + ID + '.npy')
+
+			Y[i] = label.astype(np.float32)/255.
+			y = Y[i].copy()
+			band = np.expand_dims(y[...,1],axis=-1)
+#			X[i] = np.concatenate((band, band, band), axis=-1)
+
+			band[1:-1] = 0.
+			X[i] = np.concatenate((X_image, band), axis=-1)
+
+#			X[i][5] = 0.
+
 ##			ic(np.unique(label, return_counts=True))
 ##			ic(np.unique(label[...,0], return_counts=True))
 ##			ic(np.unique(label[...,1], return_counts=True))
@@ -102,7 +116,6 @@ class DataGenerator(keras.utils.Sequence):
 			##cv2.imwrite("sample_label.png", label[...,0].astype(np.int))
 			##pdb.set_trace()
 
-			Y[i] = label.astype(np.float32)/255.
 #		X = self.scalerApply(X)	
 		#ic(np.average(X), np.std(X))	
 		#pdb.set_trace()	
