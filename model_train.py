@@ -332,6 +332,8 @@ def BUnetConvLSTM_NtoN(params):
 	print(model.summary())
 	return model
 
+
+
 def BUnetConvLSTM_Skip_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
@@ -357,7 +359,7 @@ def BUnetConvLSTM_Skip_NtoN(params):
 	d1 = transpose_layer_over_time(d2,fs)
 	d1 = keras.layers.concatenate([d1, p1], axis=-1)
 	out=convolution_layer_over_time(d1,fs)
-	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='sigmoid',
+	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='softmax',
 								padding='same'))(out)
 	model = Model(in_im, out)
 	print(model.summary())
@@ -440,7 +442,7 @@ def partition_get():
 	ic(partition['train'])
 	ic(partition['test'])
 
-	partition['train'], partition['validation'] = train_test_split(partition['train'], validation_size=4)
+	partition['train'], partition['validation'] = train_test_split(partition['train'], validation_size=8)
 	ic(partition['validation'])
 
 	return partition
@@ -488,7 +490,7 @@ if __name__ == "__main__":
 	file_output='model.hdf5'
 	trainMode = True
 	if trainMode == True:
-		model.compile(optimizer=Adam(lr=0.001, decay=0.00016667),
+		model.compile(optimizer=Adam(lr=0.0001, decay=0.00016667),
 					#loss='binary_crossentropy',
 					loss=weighted_categorical_crossentropy(class_weights),
 #					loss=categorical_focal_loss(gamma=2., alpha=.25),
@@ -503,7 +505,7 @@ if __name__ == "__main__":
 
 		# Train model on dataset
 		history = model.fit_generator(generator=training_generator,
-							epochs=100,
+							epochs=500,
 							validation_data=validation_generator,
 #							callbacks=[es])
 							callbacks = [Monitor(validation=validation_generator,patience = 15,
