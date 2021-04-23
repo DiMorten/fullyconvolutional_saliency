@@ -23,7 +23,7 @@ import joblib
 
 class DataGenerator(keras.utils.Sequence):
 	'Generates data for Keras'
-	def __init__(self, list_IDs, labels, batch_size=6, dim=(20,128,128), label_dim=(128,128), n_channels=3,
+	def __init__(self, list_IDs, labels, batch_size=6, dim=(20,128,128), Nto1_label_dim=(128,128), n_channels=3,
 				 n_classes=2, shuffle=True, scaler=None):
 		'Initialization'
 		self.dim = dim
@@ -34,7 +34,7 @@ class DataGenerator(keras.utils.Sequence):
 		self.n_channels = n_channels
 		self.n_classes = n_classes
 		self.shuffle = shuffle
-		self.label_dim = label_dim
+		self.Nto1_label_dim = Nto1_label_dim
 		self.scaler = scaler
 		self.on_epoch_end()
 
@@ -75,8 +75,10 @@ class DataGenerator(keras.utils.Sequence):
 		# Initialization
 #		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float32)
 		X = np.empty((self.batch_size, *self.dim, self.n_channels), dtype=np.float32)
-#		Y = np.empty((self.batch_size, *self.label_dim, self.n_classes), dtype=int)
-		Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=np.float32)
+		#Y = np.empty((self.batch_size, *self.dim, self.n_classes), dtype=np.float32)
+
+		# You: Uncomment this line for N-to-1 label type
+		Y = np.empty((self.batch_size, *self.Nto1_label_dim, self.n_classes), dtype=int)
 
 		#print(list_IDs_temp)
 		# Generate data
@@ -96,13 +98,19 @@ class DataGenerator(keras.utils.Sequence):
 			# For N-to-N config, delete the [-1] indexing to get all the label frames. 
 			# 	That way, Y[i] shape will be (t, h, w)
 ###			label = np.load('labels/' + ID + '.npy')
-			Y[i] = np.load('labels/' + ID + '.npy').astype(np.float32)/255.
+#			Y[i] = np.load('labels/' + ID + '.npy').astype(np.float32)/255.
+			# You: Uncomment this for N-to-1 (Classify last frame only)
+			Y[i] = np.load('labels/' + ID + '.npy')[-1].astype(np.float32)/255.
+
+
 ###			Y[i] = label.astype(np.float32)/255.
 ###			y = Y[i].copy()
 ###			band = np.expand_dims(y[...,1],axis=-1)
 #			X[i] = np.concatenate((band, band, band), axis=-1)
 
-###			band[1:-1] = 0.
+#####			band[1:-1] = 0.
+###			band[1:] = 0.
+
 ###			X[i] = np.concatenate((X_image, band), axis=-1)
 
 #			X[i][5] = 0.
