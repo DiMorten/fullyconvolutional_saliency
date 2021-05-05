@@ -237,32 +237,7 @@ def transpose_layer_over_time(x,filter_size,dilation_rate=1,
 
 def BUnetConvLSTM_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
-	weight_decay=1E-4
 
-	fs=16
-	p1=convolution_layer_over_time(in_im,fs)			
-	p1=convolution_layer_over_time(p1,fs)
-	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
-	p2=convolution_layer_over_time(e1,fs*2)
-	e2 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p2)
-	p3=convolution_layer_over_time(e2,fs*4)
-	e3 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p3)
-
-	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=True,
-			padding="same"),merge_mode='concat')(e3)
-#	x = TimeDistributed(Conv2D(64, (1, 1), activation='relu',
-#								padding='same'))(e3)
-	d3 = transpose_layer_over_time(x,fs*4)
-	d3 = keras.layers.concatenate([d3, p3], axis=-1)
-	d3=convolution_layer_over_time(d3,fs*4)
-	d2 = transpose_layer_over_time(d3,fs*2)
-	d2 = keras.layers.concatenate([d2, p2], axis=-1)
-	d2=convolution_layer_over_time(d2,fs*2)
-	d1 = transpose_layer_over_time(d2,fs)
-	d1 = keras.layers.concatenate([d1, p1], axis=-1)
-	out=convolution_layer_over_time(d1,fs)
-	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='softmax',
-								padding='same'))(out)
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
@@ -271,22 +246,14 @@ def BUnetConvLSTM_NtoN(params):
 
 def BConvLSTM_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
-	weight_decay=1E-4
-	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=True,
-			padding="same"),merge_mode='concat')(in_im)
-	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='softmax',
-								padding='same'))(x)
+
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
 
 def UConvLSTM_NtoN(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
-	weight_decay=1E-4
-	x = ConvLSTM2D(64,3,return_sequences=True,
-			padding="same")(in_im)
-	out = TimeDistributed(Conv2D(params['n_classes'], (1, 1), activation='softmax',
-								padding='same'))(x)
+
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
@@ -295,42 +262,14 @@ def UConvLSTM_NtoN(params):
 
 def BUnetConvLSTM_Nto1(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
-	weight_decay=1E-4
-
-	fs=16
-	p1=convolution_layer_over_time(in_im,fs)			
-	p1=convolution_layer_over_time(p1,fs)
-	e1 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p1)
-	p2=convolution_layer_over_time(e1,fs*2)
-	e2 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p2)
-	p3=convolution_layer_over_time(e2,fs*4)
-	e3 = TimeDistributed(AveragePooling2D((2, 2), strides=(2, 2)))(p3)
-
-	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=False,
-			padding="same"),merge_mode='concat')(e3)
-#	x = TimeDistributed(Conv2D(64, (1, 1), activation='relu',
-#								padding='same'))(e3)
-	d3 = transpose_layer(x,fs*4)
-#	d3 = keras.layers.concatenate([d3, p3], axis=-1)
-	d3=convolution_layer(d3,fs*4)
-	d2 = transpose_layer(d3,fs*2)
-#	d2 = keras.layers.concatenate([d2, p2], axis=-1)
-	d2=convolution_layer(d2,fs*2)
-	d1 = transpose_layer(d2,fs)
-#	d1 = keras.layers.concatenate([d1, p1], axis=-1)
-	out=convolution_layer(d1,fs)
-	out = Conv2D(params['n_classes'], (1, 1), activation='softmax',
-								padding='same')(out)
+	
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
 def BConvLSTM_Nto1(params):
 	in_im = Input(shape=(*params['dim'], params['n_channels']))
 	weight_decay=1E-4
-	x = Bidirectional(ConvLSTM2D(64,3,return_sequences=False,
-			padding="same"),merge_mode='concat')(in_im)
-	out = Conv2D(params['n_classes'], (1, 1), activation='softmax',
-								padding='same')(x)
+
 	model = Model(in_im, out)
 	print(model.summary())
 	return model
