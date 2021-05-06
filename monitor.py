@@ -50,7 +50,7 @@ class Monitor(Callback):
         self.classes = classes
         self.f1_history = []
         self.oa_history = []
-        self.scaler = joblib.load('scaler.save')
+        #self.scaler = joblib.load('scaler.save')
         
     def on_train_begin(self, logs={}):
         # The number of epoch it has waited when loss is no longer minimum.
